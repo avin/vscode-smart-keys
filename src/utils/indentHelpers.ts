@@ -24,7 +24,37 @@ export function findPreviousNonEmptyLine(
  * Проверяет, должен ли отступ быть увеличен на основе текста строки
  */
 export function shouldIncreaseIndent(lineText: string): boolean {
-	return /[{:(\[]\s*$/.test(lineText.trim());
+	const trimmedLine = lineText.trim();
+
+	return /[{:(\[]\s*$/.test(trimmedLine) || isHtmlLikeOpeningTag(trimmedLine);
+}
+
+/**
+ * Определяет, должен ли HTML/JSX тег увеличивать уровень вложенности
+ */
+function isHtmlLikeOpeningTag(trimmedLine: string): boolean {
+	if (!trimmedLine.startsWith('<')) {
+		return false;
+	}
+
+	if (
+		trimmedLine.startsWith('</') || // закрывающий тег
+		trimmedLine.startsWith('<!--') || // комментарий
+		trimmedLine.startsWith('<!') || // doctype/инструкции
+		trimmedLine.startsWith('<?') // xml-declaration
+	) {
+		return false;
+	}
+
+	if (trimmedLine.endsWith('/>')) {
+		return false;
+	}
+
+	if (trimmedLine === '<>') {
+		return true;
+	}
+
+	return /<[\w.:$-]+(?:\s[^>]*)?>\s*$/.test(trimmedLine);
 }
 
 /**
@@ -68,4 +98,3 @@ export function calculateIndent(
 		return prevIndent + '\t';
 	}
 }
-
