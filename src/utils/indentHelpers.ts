@@ -89,12 +89,15 @@ export function calculateIndent(
 	}
 
 	// Увеличиваем отступ
+	return prevIndent + getIndentUnit(editor);
+}
+
+/**
+ * Возвращает единицу отступа согласно настройкам редактора
+ */
+export function getIndentUnit(editor: vscode.TextEditor): string {
 	const tabSize = editor.options.tabSize as number || 4;
 	const insertSpaces = editor.options.insertSpaces !== false;
 	
-	if (insertSpaces) {
-		return prevIndent + ' '.repeat(tabSize);
-	} else {
-		return prevIndent + '\t';
-	}
+	return insertSpaces ? ' '.repeat(tabSize) : '\t';
 }

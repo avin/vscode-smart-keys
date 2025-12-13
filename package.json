@@ -26,6 +26,10 @@
       {
         "command": "smart-keys.smartBackspace",
         "title": "Smart Backspace"
+      },
+      {
+        "command": "smart-keys.smartEnter",
+        "title": "Smart Enter"
       }
     ],
     "keybindings": [
@@ -37,6 +41,11 @@
       {
         "command": "smart-keys.smartBackspace",
         "key": "backspace",
+        "when": "editorTextFocus && !editorReadonly"
+      },
+      {
+        "command": "smart-keys.smartEnter",
+        "key": "enter",
         "when": "editorTextFocus && !editorReadonly"
       }
     ]

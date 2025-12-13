@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
 import { SmartEndHandler } from './handlers/smartEndHandler';
 import { SmartBackspaceHandler } from './handlers/smartBackspaceHandler';
+import { SmartEnterHandler } from './handlers/smartEnterHandler';
 
 // Инстансы обработчиков
 const smartEndHandler = new SmartEndHandler();
 const smartBackspaceHandler = new SmartBackspaceHandler();
+const smartEnterHandler = new SmartEnterHandler();
 
 /**
  * Регистрирует обработчик изменения позиции курсора
@@ -66,6 +68,20 @@ function registerSmartBackspaceCommand(): vscode.Disposable {
 }
 
 /**
+ * Регистрирует команду Smart Enter
+ */
+function registerSmartEnterCommand(): vscode.Disposable {
+	return vscode.commands.registerCommand('smart-keys.smartEnter', async () => {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			return;
+		}
+
+		await smartEnterHandler.execute(editor);
+	});
+}
+
+/**
  * Активация расширения
  */
 export function activate(context: vscode.ExtensionContext): void {
@@ -76,7 +92,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		registerCursorChangeHandler(),
 		registerDocumentChangeHandler(),
 		registerSmartEndCommand(),
-		registerSmartBackspaceCommand()
+		registerSmartBackspaceCommand(),
+		registerSmartEnterCommand()
 	];
 
 	context.subscriptions.push(...disposables);
