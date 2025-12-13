@@ -17,3 +17,13 @@ Smart behavior for `End` and `Backspace` keys, similar to JetBrains IDEs.
 ### Smart Enter
 
 - When the last non-whitespace character on the line is `{`, automatically inserts a closing `}` with proper indentation and places the cursor inside the new block
+
+## Settings
+
+All smart behaviors can be disabled individually (enabled by default):
+
+- `smart-keys.smartEnd.indentEmptyLine` — auto-indent on empty lines when pressing End
+- `smart-keys.smartEnd.toggleTrimmedEnd` — toggle between trimmed end and full line end
+- `smart-keys.smartBackspace.handleEmptyLine` — special handling for empty lines on Backspace
+- `smart-keys.smartBackspace.handleIndentZone` — indent-zone handling for Backspace (fixing indent or joining lines)
+- `smart-keys.smartEnter.autoInsertClosingBrace` — auto insertion of closing brace on Enter after `{`

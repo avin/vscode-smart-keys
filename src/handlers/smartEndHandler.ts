@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import { calculateIndent } from '../utils/indentHelpers';
 import { setCursorPosition } from '../utils/cursorHelpers';
+import { getSmartKeysConfiguration } from '../configuration';
 
 /**
- * Состояние для отслеживания последней позиции End
+ * State for tracking the last End position.
  */
 interface EndPositionState {
 	line: number;
@@ -15,14 +16,14 @@ export class SmartEndHandler {
 	private lastEndPositions = new Map<string, EndPositionState>();
 
 	/**
-	 * Сбрасывает состояние для документа
+	 * Reset stored state for a document.
 	 */
 	public resetState(documentUri: string): void {
 		this.lastEndPositions.delete(documentUri);
 	}
 
 	/**
-	 * Проверяет, нужно ли сбросить состояние при перемещении курсора
+	 * Decide whether End state should be reset after cursor move.
 	 */
 	public shouldResetOnCursorMove(
 		documentUri: string,
@@ -38,7 +39,7 @@ export class SmartEndHandler {
 	}
 
 	/**
-	 * Обрабатывает нажатие End на пустой строке
+	 * Handle End on an empty line.
 	 */
 	private async handleEmptyLine(
 		editor: vscode.TextEditor,
@@ -49,7 +50,7 @@ export class SmartEndHandler {
 	): Promise<void> {
 		const targetIndent = calculateIndent(editor, document, currentLine);
 
-		// Вставляем отступы
+		// Insert target indent
 		await editor.edit(editBuilder => {
 			const lineRange = new vscode.Range(
 				new vscode.Position(currentLine, 0),
@@ -59,10 +60,10 @@ export class SmartEndHandler {
 			editBuilder.insert(new vscode.Position(currentLine, 0), targetIndent);
 		});
 
-		// Устанавливаем курсор
+		// Place cursor
 		setCursorPosition(editor, currentLine, targetIndent.length);
 		
-		// Сохраняем состояние
+		// Store state
 		this.lastEndPositions.set(documentUri, {
 			line: currentLine,
 			character: targetIndent.length,
@@ -71,7 +72,7 @@ export class SmartEndHandler {
 	}
 
 	/**
-	 * Обрабатывает нажатие End на строке с содержимым
+	 * Handle End on a non-empty line.
 	 */
 	private handleNonEmptyLine(
 		editor: vscode.TextEditor,
@@ -92,26 +93,26 @@ export class SmartEndHandler {
 		let atTrimmedEnd: boolean;
 
 		if (isAtEnd && lastPos.atTrimmedEnd && currentChar === trimmedLength) {
-			// Переключаемся на полный конец (с пробелами)
+			// Switch to full end (with trailing spaces)
 			targetPosition = fullLength;
 			atTrimmedEnd = false;
 		} else if (isAtEnd && !lastPos.atTrimmedEnd && currentChar === fullLength) {
-			// Переключаемся обратно на конец без пробелов
+			// Switch back to trimmed end
 			targetPosition = trimmedLength;
 			atTrimmedEnd = true;
 		} else if (currentChar === trimmedLength && trimmedLength < fullLength) {
-			// Если уже в конце без пробелов, сразу переходим в конец с пробелами
+			// Already at trimmed end, jump to full end
 			targetPosition = fullLength;
 			atTrimmedEnd = false;
 		} else {
-			// Первое нажатие - идем на конец без пробелов
+			// First press: go to trimmed end
 			targetPosition = trimmedLength;
 			atTrimmedEnd = true;
 		}
 
 		setCursorPosition(editor, currentLine, targetPosition);
 		
-		// Сохраняем состояние
+		// Store state
 		this.lastEndPositions.set(documentUri, {
 			line: currentLine,
 			character: targetPosition,
@@ -120,9 +121,10 @@ export class SmartEndHandler {
 	}
 
 	/**
-	 * Основной обработчик команды Smart End
+	 * Main handler for Smart End.
 	 */
 	public async execute(editor: vscode.TextEditor): Promise<void> {
+		const { smartEnd } = getSmartKeysConfiguration();
 		const document = editor.document;
 		const selection = editor.selection;
 		const currentLine = selection.active.line;
@@ -131,19 +133,28 @@ export class SmartEndHandler {
 		const documentUri = document.uri.toString();
 
 		if (lineText.trim().length === 0) {
-			// Пустая строка
+			if (!smartEnd.indentEmptyLine) {
+				this.resetState(documentUri);
+				await vscode.commands.executeCommand('cursorEnd');
+				return;
+			}
+			// Empty line
 			await this.handleEmptyLine(editor, document, currentLine, lineText, documentUri);
 		} else {
-			// Строка с содержимым
+			if (!smartEnd.toggleTrimmedEnd) {
+				this.resetState(documentUri);
+				await vscode.commands.executeCommand('cursorEnd');
+				return;
+			}
+			// Line with content
 			this.handleNonEmptyLine(editor, currentLine, currentChar, lineText, documentUri);
 		}
 	}
 
 	/**
-	 * Очищает все состояния
+	 * Clear all stored state.
 	 */
 	public clear(): void {
 		this.lastEndPositions.clear();
 	}
 }
-

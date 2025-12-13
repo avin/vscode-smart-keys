@@ -1,5 +1,5 @@
 /**
- * Возвращает количество незакрытых фигурных скобок в документе
+ * Count unmatched opening braces in the document.
  */
 export function countUnmatchedBraces(lines: string[]): number {
 	const stack: Array<{ line: number; char: number }> = [];
@@ -22,7 +22,7 @@ export function countUnmatchedBraces(lines: string[]): number {
 }
 
 /**
- * Проверяет, осталась ли конкретная фигурная скобка в стеке после разбора документа
+ * Check if a specific opening brace remains unmatched after parsing.
  */
 export function isBraceUnmatched(
 	lines: string[],
@@ -51,10 +51,10 @@ export function isBraceUnmatched(
 }
 
 /**
- * Проверяет, нужно ли вставлять закрывающую скобку для целевой фигурной скобки.
- * Вставляем, если:
- * - она явно осталась незакрытой, или
- * - удаление этой скобки уменьшает количество незакрытых скобок (т.е. текущий код балансируется её закрытием)
+ * Decide whether to insert a closing brace for the given opening brace.
+ * Insert if:
+ * - the brace is unmatched, or
+ * - removing it decreases the count of unmatched braces (code balances with its closing).
  */
 export function shouldInsertClosingBrace(
 	lines: string[],

@@ -32,6 +32,36 @@
         "title": "Smart Enter"
       }
     ],
+    "configuration": {
+      "title": "Smart Keys",
+      "properties": {
+        "smart-keys.smartEnd.indentEmptyLine": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable auto-indent on empty lines when pressing End."
+        },
+        "smart-keys.smartEnd.toggleTrimmedEnd": {
+          "type": "boolean",
+          "default": true,
+          "description": "Toggle End between trimmed end of line and full end (with trailing whitespace)."
+        },
+        "smart-keys.smartBackspace.handleEmptyLine": {
+          "type": "boolean",
+          "default": true,
+          "description": "Handle Backspace on empty lines (remove previous empty line or move to previous line)."
+        },
+        "smart-keys.smartBackspace.handleIndentZone": {
+          "type": "boolean",
+          "default": true,
+          "description": "Handle Backspace inside indent zone (fix indent or join lines)."
+        },
+        "smart-keys.smartEnter.autoInsertClosingBrace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically insert a closing brace when pressing Enter after an opening `{`."
+        }
+      }
+    },
     "keybindings": [
       {
         "command": "smart-keys.smartEnd",

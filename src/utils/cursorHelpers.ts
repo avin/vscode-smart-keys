@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 /**
- * Устанавливает позицию курсора и прокручивает к ней
+ * Set cursor position and reveal it.
  */
 export function setCursorPosition(
 	editor: vscode.TextEditor,
@@ -14,7 +14,7 @@ export function setCursorPosition(
 }
 
 /**
- * Проверяет, находится ли курсор в зоне отступа (до первого символа)
+ * Check whether cursor is in the indent zone (before first non-space char).
  */
 export function isInIndentZone(lineText: string, cursorChar: number): boolean {
 	const firstNonWhitespaceIndex = lineText.search(/\S/);
@@ -22,10 +22,9 @@ export function isInIndentZone(lineText: string, cursorChar: number): boolean {
 }
 
 /**
- * Получает позицию первого непробельного символа
+ * Get index of the first non-whitespace character.
  */
 export function getFirstNonWhitespaceIndex(lineText: string): number {
 	const index = lineText.search(/\S/);
 	return index === -1 ? 0 : index;
 }
-

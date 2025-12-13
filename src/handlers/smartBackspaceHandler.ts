@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import { calculateIndent } from '../utils/indentHelpers';
 import { setCursorPosition, isInIndentZone, getFirstNonWhitespaceIndex } from '../utils/cursorHelpers';
+import { getSmartKeysConfiguration } from '../configuration';
 
 export class SmartBackspaceHandler {
 	/**
-	 * Обрабатывает Backspace на пустой строке с пустой предыдущей строкой
+	 * Handle Backspace on an empty line when the previous line is also empty.
 	 */
 	private async handleEmptyLineWithEmptyPrevious(
 		editor: vscode.TextEditor,
@@ -14,7 +15,7 @@ export class SmartBackspaceHandler {
 	): Promise<boolean> {
 		const targetIndent = calculateIndent(editor, document, currentLine);
 		
-		// Удаляем предыдущую пустую строку и устанавливаем отступ
+		// Remove previous empty line and apply target indent
 		await editor.edit(editBuilder => {
 			const deleteRange = new vscode.Range(
 				new vscode.Position(currentLine - 1, 0),
@@ -34,7 +35,7 @@ export class SmartBackspaceHandler {
 	}
 
 	/**
-	 * Обрабатывает Backspace на пустой строке с текстовой предыдущей строкой
+	 * Handle Backspace on an empty line when the previous line has text.
 	 */
 	private async handleEmptyLineWithTextPrevious(
 		editor: vscode.TextEditor,
@@ -45,14 +46,14 @@ export class SmartBackspaceHandler {
 		const cursorPosition = prevTextTrimmed.length;
 		
 		await editor.edit(editBuilder => {
-			// Удаляем текущую пустую строку
+			// Remove current empty line
 			const deleteRange = new vscode.Range(
 				new vscode.Position(currentLine, 0),
 				new vscode.Position(currentLine + 1, 0)
 			);
 			editBuilder.delete(deleteRange);
 			
-			// Удаляем пробелы в конце предыдущей строки
+			// Trim trailing spaces in previous line
 			if (prevText.length > prevTextTrimmed.length) {
 				const trimRange = new vscode.Range(
 					new vscode.Position(currentLine - 1, prevTextTrimmed.length),
@@ -67,7 +68,7 @@ export class SmartBackspaceHandler {
 	}
 
 	/**
-	 * Обрабатывает Backspace на пустой строке
+	 * Handle Backspace on an empty line.
 	 */
 	private async handleEmptyLine(
 		editor: vscode.TextEditor,
@@ -83,16 +84,16 @@ export class SmartBackspaceHandler {
 		const prevText = prevLine.text;
 		
 		if (prevText.trim().length === 0) {
-			// Предыдущая строка пустая
+			// Previous line is empty
 			return await this.handleEmptyLineWithEmptyPrevious(editor, document, currentLine, lineText);
 		} else {
-			// Предыдущая строка содержит текст
+			// Previous line contains text
 			return await this.handleEmptyLineWithTextPrevious(editor, currentLine, prevText);
 		}
 	}
 
 	/**
-	 * Обрабатывает Backspace в зоне отступа с пустой предыдущей строкой
+	 * Handle Backspace in indent zone when the previous line is empty.
 	 */
 	private async handleIndentZoneWithEmptyPrevious(
 		editor: vscode.TextEditor,
@@ -112,7 +113,7 @@ export class SmartBackspaceHandler {
 	}
 
 	/**
-	 * Обрабатывает Backspace в зоне отступа с текстовой предыдущей строкой
+	 * Handle Backspace in indent zone when the previous line has text.
 	 */
 	private async handleIndentZoneWithTextPrevious(
 		editor: vscode.TextEditor,
@@ -139,7 +140,7 @@ export class SmartBackspaceHandler {
 	}
 
 	/**
-	 * Обрабатывает Backspace в зоне отступа
+	 * Handle Backspace inside the indent zone.
 	 */
 	private async handleIndentZone(
 		editor: vscode.TextEditor,
@@ -154,10 +155,10 @@ export class SmartBackspaceHandler {
 		const firstNonWhitespaceIndex = getFirstNonWhitespaceIndex(lineText);
 		const currentIndent = lineText.substring(0, firstNonWhitespaceIndex);
 		
-		// Вычисляем правильный отступ для этой строки
+		// Calculate correct indent for the line
 		const correctIndent = calculateIndent(editor, document, currentLine);
 		
-		// Если текущий отступ больше правильного, исправляем его
+		// If current indent is too large, fix it
 		if (currentIndent.length > correctIndent.length) {
 			await editor.edit(editBuilder => {
 				const indentRange = new vscode.Range(
@@ -171,27 +172,28 @@ export class SmartBackspaceHandler {
 			return true;
 		}
 		
-		// Если отступ правильный, выполняем логику удаления/объединения
+		// If indent is correct, run deletion/merge logic
 		const prevLine = document.lineAt(currentLine - 1);
 		const prevText = prevLine.text;
 		
 		if (prevText.trim().length === 0) {
-			// Предыдущая строка пустая
+			// Previous line is empty
 			return await this.handleIndentZoneWithEmptyPrevious(editor, currentLine, firstNonWhitespaceIndex);
 		} else {
-			// Предыдущая строка содержит текст
+			// Previous line contains text
 			return await this.handleIndentZoneWithTextPrevious(editor, currentLine, lineText, prevText);
 		}
 	}
 
 	/**
-	 * Основной обработчик команды Smart Backspace
+	 * Main handler for Smart Backspace.
 	 */
 	public async execute(editor: vscode.TextEditor): Promise<void> {
+		const { smartBackspace } = getSmartKeysConfiguration();
 		const document = editor.document;
 		const selection = editor.selection;
 		
-		// Если есть выделение, используем стандартное поведение
+		// With selection use default behavior
 		if (!selection.isEmpty) {
 			await vscode.commands.executeCommand('deleteLeft');
 			return;
@@ -201,24 +203,23 @@ export class SmartBackspaceHandler {
 		const currentChar = selection.active.character;
 		const lineText = document.lineAt(currentLine).text;
 
-		// Проверяем, пустая ли текущая строка
-		if (lineText.trim().length === 0) {
+		// Check whether current line is empty
+		if (lineText.trim().length === 0 && smartBackspace.handleEmptyLine) {
 			const handled = await this.handleEmptyLine(editor, document, currentLine, lineText);
 			if (handled) {
 				return;
 			}
 		}
 
-		// Проверяем, находимся ли в зоне отступа
-		if (isInIndentZone(lineText, currentChar)) {
+		// Check whether cursor is in indent zone
+		if (isInIndentZone(lineText, currentChar) && smartBackspace.handleIndentZone) {
 			const handled = await this.handleIndentZone(editor, document, currentLine, lineText);
 			if (handled) {
 				return;
 			}
 		}
 
-		// Стандартное поведение Backspace
+		// Default Backspace behavior
 		await vscode.commands.executeCommand('deleteLeft');
 	}
 }
-

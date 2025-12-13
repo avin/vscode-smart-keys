@@ -3,14 +3,13 @@ import { SmartEndHandler } from './handlers/smartEndHandler';
 import { SmartBackspaceHandler } from './handlers/smartBackspaceHandler';
 import { SmartEnterHandler } from './handlers/smartEnterHandler';
 
-// Инстансы обработчиков
+// Handler instances
 const smartEndHandler = new SmartEndHandler();
 const smartBackspaceHandler = new SmartBackspaceHandler();
 const smartEnterHandler = new SmartEnterHandler();
 
 /**
- * Регистрирует обработчик изменения позиции курсора
- * Сбрасывает состояние End при ручном перемещении курсора
+ * Register handler for cursor movement and reset End state on manual moves.
  */
 function registerCursorChangeHandler(): vscode.Disposable {
 	return vscode.window.onDidChangeTextEditorSelection(event => {
@@ -29,8 +28,7 @@ function registerCursorChangeHandler(): vscode.Disposable {
 }
 
 /**
- * Регистрирует обработчик изменения документа
- * Сбрасывает состояние End при редактировании
+ * Register handler for document changes and reset End state on edits.
  */
 function registerDocumentChangeHandler(): vscode.Disposable {
 	return vscode.workspace.onDidChangeTextDocument(event => {
@@ -40,7 +38,7 @@ function registerDocumentChangeHandler(): vscode.Disposable {
 }
 
 /**
- * Регистрирует команду Smart End
+ * Register Smart End command.
  */
 function registerSmartEndCommand(): vscode.Disposable {
 	return vscode.commands.registerCommand('smart-keys.smartEnd', async () => {
@@ -54,7 +52,7 @@ function registerSmartEndCommand(): vscode.Disposable {
 }
 
 /**
- * Регистрирует команду Smart Backspace
+ * Register Smart Backspace command.
  */
 function registerSmartBackspaceCommand(): vscode.Disposable {
 	return vscode.commands.registerCommand('smart-keys.smartBackspace', async () => {
@@ -68,7 +66,7 @@ function registerSmartBackspaceCommand(): vscode.Disposable {
 }
 
 /**
- * Регистрирует команду Smart Enter
+ * Register Smart Enter command.
  */
 function registerSmartEnterCommand(): vscode.Disposable {
 	return vscode.commands.registerCommand('smart-keys.smartEnter', async () => {
@@ -82,12 +80,12 @@ function registerSmartEnterCommand(): vscode.Disposable {
 }
 
 /**
- * Активация расширения
+ * Extension activation.
  */
 export function activate(context: vscode.ExtensionContext): void {
 	console.log('Smart Keys extension is now active!');
 
-	// Регистрируем все обработчики и команды
+	// Register handlers and commands
 	const disposables = [
 		registerCursorChangeHandler(),
 		registerDocumentChangeHandler(),
@@ -100,7 +98,7 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Деактивация расширения
+ * Extension deactivation.
  */
 export function deactivate(): void {
 	smartEndHandler.clear();

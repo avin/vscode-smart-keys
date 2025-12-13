@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { getIndentFromLine, getIndentUnit } from '../utils/indentHelpers';
 import { setCursorPosition } from '../utils/cursorHelpers';
 import { shouldInsertClosingBrace } from '../utils/braceHelpers';
+import { getSmartKeysConfiguration } from '../configuration';
 
 export class SmartEnterHandler {
 	private async insertDefaultNewLine(): Promise<void> {
@@ -10,6 +11,7 @@ export class SmartEnterHandler {
 
 	public async execute(editor: vscode.TextEditor): Promise<void> {
 		const { document, selection } = editor;
+		const { smartEnter } = getSmartKeysConfiguration();
 
 		if (!selection.isEmpty) {
 			await this.insertDefaultNewLine();
@@ -30,12 +32,12 @@ export class SmartEnterHandler {
 		const braceCharIndex = trimmedLine.length - 1;
 
 		const lastNonWhitespaceChar = trimmedLine.charAt(trimmedLine.length - 1);
-		if (lastNonWhitespaceChar !== '{') {
+		if (lastNonWhitespaceChar !== '{' || !smartEnter.autoInsertClosingBrace) {
 			await this.insertDefaultNewLine();
 			return;
 		}
 
-		// Не вмешиваемся, если курсор стоит до фигурной скобки
+		// Skip if cursor is before the brace
 		if (currentChar < trimmedLine.length) {
 			await this.insertDefaultNewLine();
 			return;

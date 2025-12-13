@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 /**
- * Находит первую непустую строку выше указанной
+ * Find the first non-empty line above the given one.
  */
 export function findPreviousNonEmptyLine(
 	document: vscode.TextDocument,
@@ -21,7 +21,7 @@ export function findPreviousNonEmptyLine(
 }
 
 /**
- * Проверяет, должен ли отступ быть увеличен на основе текста строки
+ * Check whether indent should increase based on the line text.
  */
 export function shouldIncreaseIndent(lineText: string): boolean {
 	const trimmedLine = lineText.trim();
@@ -30,7 +30,7 @@ export function shouldIncreaseIndent(lineText: string): boolean {
 }
 
 /**
- * Определяет, должен ли HTML/JSX тег увеличивать уровень вложенности
+ * Detect whether an HTML/JSX-like tag should increase indent level.
  */
 function isHtmlLikeOpeningTag(trimmedLine: string): boolean {
 	if (!trimmedLine.startsWith('<')) {
@@ -38,9 +38,9 @@ function isHtmlLikeOpeningTag(trimmedLine: string): boolean {
 	}
 
 	if (
-		trimmedLine.startsWith('</') || // закрывающий тег
-		trimmedLine.startsWith('<!--') || // комментарий
-		trimmedLine.startsWith('<!') || // doctype/инструкции
+		trimmedLine.startsWith('</') || // closing tag
+		trimmedLine.startsWith('<!--') || // comment
+		trimmedLine.startsWith('<!') || // doctype/directives
 		trimmedLine.startsWith('<?') // xml-declaration
 	) {
 		return false;
@@ -58,7 +58,7 @@ function isHtmlLikeOpeningTag(trimmedLine: string): boolean {
 }
 
 /**
- * Извлекает отступ из строки
+ * Extract indent string from a line.
  */
 export function getIndentFromLine(lineText: string): string {
 	const match = lineText.match(/^(\s*)/);
@@ -66,7 +66,7 @@ export function getIndentFromLine(lineText: string): string {
 }
 
 /**
- * Вычисляет правильный отступ на основе предыдущей строки
+ * Calculate correct indent based on the previous non-empty line.
  */
 export function calculateIndent(
 	editor: vscode.TextEditor,
@@ -88,12 +88,12 @@ export function calculateIndent(
 		return prevIndent;
 	}
 
-	// Увеличиваем отступ
+	// Increase indent
 	return prevIndent + getIndentUnit(editor);
 }
 
 /**
- * Возвращает единицу отступа согласно настройкам редактора
+ * Return indent unit according to editor settings.
  */
 export function getIndentUnit(editor: vscode.TextEditor): string {
 	const tabSize = editor.options.tabSize as number || 4;
