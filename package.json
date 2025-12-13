@@ -3,8 +3,8 @@
   "displayName": "Smart Keys",
   "publisher": "c75",
   "icon": "icon.png",
-  "description": "Smart behavior for End and Backspace keys, similar to JetBrains IDEs",
-  "version": "0.1.2",
+  "description": "Smart keys similar to JetBrains IDEs",
+  "version": "0.2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/avin/vscode-smart-keys"

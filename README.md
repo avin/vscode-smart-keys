@@ -1,6 +1,6 @@
 # Smart Keys
 
-Smart behavior for `End` and `Backspace` keys, similar to JetBrains IDEs.
+Smart behavior for `End`, `Backspace`, `Enter` keys, similar to JetBrains IDEs.
 
 ## Features
 
