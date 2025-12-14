@@ -4,7 +4,7 @@
   "publisher": "c75",
   "icon": "icon.png",
   "description": "Smart keys similar to JetBrains IDEs",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/avin/vscode-smart-keys"
@@ -76,7 +76,7 @@
       {
         "command": "smart-keys.smartEnter",
         "key": "enter",
-        "when": "editorTextFocus && !editorReadonly"
+        "when": "editorTextFocus && !editorReadonly && !suggestWidgetVisible"
       }
     ]
   },
