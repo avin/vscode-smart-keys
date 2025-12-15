@@ -4,7 +4,7 @@
   "publisher": "c75",
   "icon": "icon.png",
   "description": "Smart keys similar to JetBrains IDEs",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/avin/vscode-smart-keys"
@@ -59,6 +59,21 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically insert a closing brace when pressing Enter after an opening `{`."
+        },
+        "smart-keys.json.insertCommaOnEnter": {
+          "type": "boolean",
+          "default": true,
+          "description": "(JSON/JSONC) Automatically insert a missing comma when pressing Enter after a property value."
+        },
+        "smart-keys.json.addWhitespaceAfterColon": {
+          "type": "boolean",
+          "default": true,
+          "description": "(JSON/JSONC) Automatically add whitespace when typing ':' after property names."
+        },
+        "smart-keys.json.addQuotesToPropertyNames": {
+          "type": "boolean",
+          "default": true,
+          "description": "(JSON/JSONC) Automatically add quotes to property names when typing ':'."
         }
       }
     },

@@ -98,10 +98,11 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace in nested block - should use correct indent', async () => {
             const content = 'class A {\n    method() {⌘}\n}';
-            const { text, offset } = parseCursor(content);
+            const { text, offset} = parseCursor(content);
             const { line, character } = offsetToPosition(text, offset);
             
             const editor = await createMockEditor(text, line, character);
+            editor.options = { tabSize: 4, insertSpaces: true };
             await handler.execute(editor);
             
             const resultText = editor.document.getText();

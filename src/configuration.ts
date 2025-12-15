@@ -12,6 +12,11 @@ export interface SmartKeysConfiguration {
 	smartEnter: {
 		autoInsertClosingBrace: boolean;
 	};
+	json: {
+		insertCommaOnEnter: boolean;
+		addWhitespaceAfterColon: boolean;
+		addQuotesToPropertyNames: boolean;
+	};
 }
 
 function getBoolean(config: vscode.WorkspaceConfiguration, key: string): boolean {
@@ -32,6 +37,11 @@ export function getSmartKeysConfiguration(): SmartKeysConfiguration {
 		},
 		smartEnter: {
 			autoInsertClosingBrace: getBoolean(config, 'smartEnter.autoInsertClosingBrace')
+		},
+		json: {
+			insertCommaOnEnter: getBoolean(config, 'json.insertCommaOnEnter'),
+			addWhitespaceAfterColon: getBoolean(config, 'json.addWhitespaceAfterColon'),
+			addQuotesToPropertyNames: getBoolean(config, 'json.addQuotesToPropertyNames')
 		}
 	};
 }

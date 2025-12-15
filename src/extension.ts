@@ -2,11 +2,13 @@ import * as vscode from 'vscode';
 import { SmartEndHandler } from './handlers/smartEndHandler';
 import { SmartBackspaceHandler } from './handlers/smartBackspaceHandler';
 import { SmartEnterHandler } from './handlers/smartEnterHandler';
+import { SmartJsonColonHandler } from './handlers/smartJsonColonHandler';
 
 // Handler instances
 const smartEndHandler = new SmartEndHandler();
 const smartBackspaceHandler = new SmartBackspaceHandler();
 const smartEnterHandler = new SmartEnterHandler();
+const smartColonHandler = new SmartJsonColonHandler();
 
 /**
  * Register handler for cursor movement and reset End state on manual moves.
@@ -80,6 +82,30 @@ function registerSmartEnterCommand(): vscode.Disposable {
 }
 
 /**
+ * Register type command interceptor for colon in JSON files
+ */
+function registerTypeCommandInterceptor(): vscode.Disposable {
+	return vscode.commands.registerCommand('type', async (args: { text: string }) => {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			return vscode.commands.executeCommand('default:type', args);
+		}
+
+		const { document } = editor;
+		const isJson = document.languageId === 'json' || document.languageId === 'jsonc';
+
+		// Intercept colon in JSON files
+		if (args.text === ':' && isJson) {
+			await smartColonHandler.execute(editor);
+			return;
+		}
+
+		// Default behavior for everything else
+		return vscode.commands.executeCommand('default:type', args);
+	});
+}
+
+/**
  * Extension activation.
  */
 export function activate(context: vscode.ExtensionContext): void {
@@ -91,7 +117,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		registerDocumentChangeHandler(),
 		registerSmartEndCommand(),
 		registerSmartBackspaceCommand(),
-		registerSmartEnterCommand()
+		registerSmartEnterCommand(),
+		registerTypeCommandInterceptor()
 	];
 
 	context.subscriptions.push(...disposables);
