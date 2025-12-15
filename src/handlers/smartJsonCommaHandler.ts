@@ -54,26 +54,36 @@ export class SmartJsonCommaHandler {
 	/**
 	 * Execute smart comma insertion on Enter
 	 */
-	public async execute(editor: vscode.TextEditor): Promise<void> {
+	public async execute(
+		editor: vscode.TextEditor,
+		options?: { insertNewLine?: boolean }
+	): Promise<boolean> {
+		const insertNewLine = options?.insertNewLine ?? true;
+		const insertNewLineIfAllowed = async () => {
+			if (insertNewLine) {
+				await this.insertDefaultNewLine();
+			}
+		};
+
 		const { document, selection } = editor;
 		const config = getSmartKeysConfiguration();
 
 		// Check if feature is enabled
 		if (!config.json.insertCommaOnEnter) {
-			await this.insertDefaultNewLine();
-			return;
+			await insertNewLineIfAllowed();
+			return false;
 		}
 
 		// Only activate for JSON/JSONC files
 		if (!this.isJsonDocument(document)) {
-			await this.insertDefaultNewLine();
-			return;
+			await insertNewLineIfAllowed();
+			return false;
 		}
 
 		// Don't handle multi-cursor or selection
 		if (!selection.isEmpty) {
-			await this.insertDefaultNewLine();
-			return;
+			await insertNewLineIfAllowed();
+			return false;
 		}
 
 		const currentLine = selection.active.line;
@@ -82,8 +92,8 @@ export class SmartJsonCommaHandler {
 
 		// Check if line needs a comma
 		if (!this.lineNeedsComma(lineText)) {
-			await this.insertDefaultNewLine();
-			return;
+			await insertNewLineIfAllowed();
+			return false;
 		}
 		// Add comma before inserting newline
 		const trimmedLength = lineText.trimEnd().length;
@@ -94,6 +104,7 @@ export class SmartJsonCommaHandler {
 		});
 
 		// Insert newline
-		await this.insertDefaultNewLine();
+		await insertNewLineIfAllowed();
+		return true;
 	}
 }

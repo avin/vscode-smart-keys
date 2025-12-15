@@ -17,16 +17,16 @@ export class SmartEnterHandler {
 	}
 
 	public async execute(editor: vscode.TextEditor): Promise<void> {
-		const { document, selection } = editor;
 		const config = getSmartKeysConfiguration();
+		const document = editor.document;
 
-		// For JSON/JSONC files, use JSON comma handler if enabled
+		// For JSON/JSONC files, try to insert comma but continue to brace logic
 		if (this.isJsonDocument(document) && config.json.insertCommaOnEnter) {
-			await this.jsonCommaHandler.execute(editor);
-			return;
+			await this.jsonCommaHandler.execute(editor, { insertNewLine: false });
 		}
 
 		const { smartEnter } = config;
+		const { selection } = editor;
 
 		if (!selection.isEmpty) {
 			await this.insertDefaultNewLine();

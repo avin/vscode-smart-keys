@@ -37,10 +37,15 @@ function offsetToPosition(text: string, offset: number): { line: number; charact
 /**
  * Create a mock text editor
  */
-async function createMockEditor(content: string, cursorLine: number, cursorChar: number): Promise<vscode.TextEditor> {
+async function createMockEditor(
+    content: string,
+    cursorLine: number,
+    cursorChar: number,
+    language: string = 'typescript'
+): Promise<vscode.TextEditor> {
     const document = await vscode.workspace.openTextDocument({
         content: content,
-        language: 'typescript'
+        language: language
     });
     
     const editor = await vscode.window.showTextDocument(document);
@@ -463,6 +468,41 @@ suite('SmartEnterHandler', () => {
         });
     });
     
+    suite('JSON integration', () => {
+        test('Enter after opening brace in JSON should insert closing brace', async () => {
+            const content = `{\n  "config": {${CURSOR}\n}`;
+            const { text, offset } = parseCursor(content);
+            const { line, character } = offsetToPosition(text, offset);
+            
+            const editor = await createMockEditor(text, line, character, 'json');
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            const lines = resultText.split(/\r?\n/);
+            
+            assert.strictEqual(lines[0], '{');
+            assert.strictEqual(lines[1], '  "config": {');
+            assert.strictEqual(lines[2], '    ');
+            assert.strictEqual(lines[3], '  }');
+            assert.strictEqual(lines[4], '}');
+        });
+
+        test('Enter after JSON property value should still add comma before newline', async () => {
+            const content = `{\n  "name": "test"${CURSOR}\n  "age": 25\n}`;
+            const { text, offset } = parseCursor(content);
+            const { line, character } = offsetToPosition(text, offset);
+            
+            const editor = await createMockEditor(text, line, character, 'json');
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            const lines = resultText.split(/\r?\n/);
+            
+            assert.ok(lines[1].includes('"name": "test",'));
+            assert.strictEqual(editor.selection.active.line, 2);
+        });
+    });
+    
     suite('Regression tests', () => {
         test('Enter after brace that steals closing from outer block', async () => {
             const content = 'function outer() {\n    const inner = () => {⌘\n';
@@ -502,6 +542,3 @@ suite('SmartEnterHandler', () => {
         });
     });
 });
-
-
-
