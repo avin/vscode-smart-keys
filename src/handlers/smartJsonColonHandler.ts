@@ -1,14 +1,9 @@
 import * as vscode from 'vscode';
 import { getSmartKeysConfiguration } from '../configuration';
+import { typeText } from '../utils/editorCommands';
+import { isJsonDocument } from '../utils/jsonHelpers';
 
 export class SmartJsonColonHandler {
-	/**
-	 * Check if the document is JSON or JSONC
-	 */
-	private isJsonDocument(document: vscode.TextDocument): boolean {
-		return document.languageId === 'json' || document.languageId === 'jsonc';
-	}
-
 	/**
 	 * Find the property name before the cursor (unquoted or quoted)
 	 */
@@ -69,13 +64,6 @@ export class SmartJsonColonHandler {
 	}
 
 	/**
-	 * Insert default colon
-	 */
-	private async insertDefaultColon(): Promise<void> {
-		await vscode.commands.executeCommand('type', { text: ':' });
-	}
-
-	/**
 	 * Execute smart colon insertion
 	 */
 	public async execute(editor: vscode.TextEditor): Promise<void> {
@@ -83,14 +71,14 @@ export class SmartJsonColonHandler {
 		const config = getSmartKeysConfiguration();
 
 		// Only activate for JSON/JSONC files
-		if (!this.isJsonDocument(document)) {
-			await this.insertDefaultColon();
+		if (!isJsonDocument(document)) {
+			await typeText(':');
 			return;
 		}
 
 		// Don't handle multi-cursor or selection
 		if (!selection.isEmpty) {
-			await this.insertDefaultColon();
+			await typeText(':');
 			return;
 		}
 
@@ -101,7 +89,7 @@ export class SmartJsonColonHandler {
 
 		// Check if there's already a colon after cursor
 		if (this.hasColonAfterCursor(lineText, currentChar)) {
-			await this.insertDefaultColon();
+			await typeText(':');
 			return;
 		}
 
@@ -109,7 +97,7 @@ export class SmartJsonColonHandler {
 		const propertyInfo = this.findPropertyNameBeforeCursor(lineText, currentChar);
 		
 		if (!propertyInfo) {
-			await this.insertDefaultColon();
+			await typeText(':');
 			return;
 		}
 

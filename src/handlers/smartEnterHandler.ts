@@ -2,26 +2,20 @@ import * as vscode from 'vscode';
 import { getIndentFromLine, getIndentUnit } from '../utils/indentHelpers';
 import { setCursorPosition } from '../utils/cursorHelpers';
 import { shouldInsertClosingBrace } from '../utils/braceHelpers';
+import { insertNewLine } from '../utils/editorCommands';
+import { isJsonDocument } from '../utils/jsonHelpers';
 import { getSmartKeysConfiguration } from '../configuration';
 import { SmartJsonCommaHandler } from './smartJsonCommaHandler';
 
 export class SmartEnterHandler {
 	private jsonCommaHandler = new SmartJsonCommaHandler();
 
-	private async insertDefaultNewLine(): Promise<void> {
-		await vscode.commands.executeCommand('type', { text: '\n' });
-	}
-
-	private isJsonDocument(document: vscode.TextDocument): boolean {
-		return document.languageId === 'json' || document.languageId === 'jsonc';
-	}
-
 	public async execute(editor: vscode.TextEditor): Promise<void> {
 		const config = getSmartKeysConfiguration();
 		const document = editor.document;
 
 		// For JSON/JSONC files, try to insert comma but continue to brace logic
-		if (this.isJsonDocument(document) && config.json.insertCommaOnEnter) {
+		if (isJsonDocument(document) && config.json.insertCommaOnEnter) {
 			await this.jsonCommaHandler.execute(editor, { insertNewLine: false });
 		}
 
@@ -29,7 +23,7 @@ export class SmartEnterHandler {
 		const { selection } = editor;
 
 		if (!selection.isEmpty) {
-			await this.insertDefaultNewLine();
+			await insertNewLine();
 			return;
 		}
 
@@ -44,13 +38,13 @@ export class SmartEnterHandler {
 		const trimmedLine = textUpToCursor.trimEnd();
 
 		if (trimmedLine.length === 0) {
-			await this.insertDefaultNewLine();
+			await insertNewLine();
 			return;
 		}
 
 		const lastNonWhitespaceChar = trimmedLine.charAt(trimmedLine.length - 1);
 		if (lastNonWhitespaceChar !== '{' || !smartEnter.autoInsertClosingBrace) {
-			await this.insertDefaultNewLine();
+			await insertNewLine();
 			return;
 		}
 
@@ -70,7 +64,7 @@ export class SmartEnterHandler {
 		});
 
 		if (!shouldInsertClosingBrace(documentLines, currentLine, braceCharIndex)) {
-			await this.insertDefaultNewLine();
+			await insertNewLine();
 			return;
 		}
 

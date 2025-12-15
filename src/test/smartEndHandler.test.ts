@@ -1,54 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { SmartEndHandler } from '../handlers/smartEndHandler';
-
-const CURSOR = '⌘';
-
-/**
- * Helper to parse cursor position from text with marker
- */
-function parseCursor(textWithCursor: string): { text: string; offset: number } {
-    const offset = textWithCursor.indexOf(CURSOR);
-    if (offset === -1) {
-        throw new Error(`No cursor marker ${CURSOR} found in text`);
-    }
-    const text = textWithCursor.slice(0, offset) + textWithCursor.slice(offset + CURSOR.length);
-    return { text, offset };
-}
-
-/**
- * Helper to find line and character from absolute offset
- */
-function offsetToPosition(text: string, offset: number): { line: number; character: number } {
-    const lines = text.split(/\r?\n/);
-    let currentOffset = 0;
-    
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-        const lineLength = lines[lineNum].length;
-        if (currentOffset + lineLength >= offset) {
-            return { line: lineNum, character: offset - currentOffset };
-        }
-        currentOffset += lineLength + 1;
-    }
-    
-    return { line: lines.length - 1, character: lines[lines.length - 1].length };
-}
-
-/**
- * Create a mock text editor
- */
-async function createMockEditor(content: string, cursorLine: number, cursorChar: number): Promise<vscode.TextEditor> {
-    const document = await vscode.workspace.openTextDocument({
-        content: content,
-        language: 'typescript'
-    });
-    
-    const editor = await vscode.window.showTextDocument(document);
-    const position = new vscode.Position(cursorLine, cursorChar);
-    editor.selection = new vscode.Selection(position, position);
-    
-    return editor;
-}
+import { CURSOR, createEditorWithCursor, createMockEditor } from './helpers/editorTestUtils';
 
 suite('SmartEndHandler', () => {
     let handler: SmartEndHandler;
@@ -60,10 +13,7 @@ suite('SmartEndHandler', () => {
     suite('End key on empty line', () => {
         test('End on empty line after opening brace - should add indent', async () => {
             const content = 'function test() {\n⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -76,10 +26,7 @@ suite('SmartEndHandler', () => {
         
         test('End on empty line with existing indent - should recalculate', async () => {
             const content = 'if (true) {\n  ⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -91,10 +38,7 @@ suite('SmartEndHandler', () => {
         
         test('End on empty line in nested structure', async () => {
             const content = 'class A {\n    method() {\n⌘\n    }\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -106,10 +50,7 @@ suite('SmartEndHandler', () => {
         
         test('End on empty line at document start', async () => {
             const content = '⌘\ncode';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -121,10 +62,7 @@ suite('SmartEndHandler', () => {
         
         test('End on empty line after array opening', async () => {
             const content = 'const arr = [\n⌘\n];';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -137,10 +75,7 @@ suite('SmartEndHandler', () => {
     suite('End key trim/full toggle', () => {
         test('End on line with content - should go to trimmed end', async () => {
             const content = '⌘const x = 1;   ';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             // Should move to trimmed end
@@ -149,10 +84,7 @@ suite('SmartEndHandler', () => {
         
         test('End at trimmed end - should toggle to full end', async () => {
             const content = 'const x = 1;⌘   ';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             
             // First press - should stay at trimmed (already there)
             await handler.execute(editor);
@@ -165,10 +97,7 @@ suite('SmartEndHandler', () => {
         
         test('End at full end - should toggle back to trimmed', async () => {
             const content = 'const x = 1;   ⌘';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             // Should toggle to trimmed end
@@ -177,10 +106,7 @@ suite('SmartEndHandler', () => {
         
         test('End in middle of line - should go to trimmed end', async () => {
             const content = 'const ⌘x = 1;   ';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             assert.strictEqual(editor.selection.active.character, 12);
@@ -188,10 +114,7 @@ suite('SmartEndHandler', () => {
         
         test('End on line without trailing spaces - should stay at end', async () => {
             const content = 'const ⌘x = 1;';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             assert.strictEqual(editor.selection.active.character, 12);
@@ -294,10 +217,7 @@ suite('SmartEndHandler', () => {
     suite('Different indent sizes', () => {
         test('End with 2-space indent', async () => {
             const content = 'if (true) {\n⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             // Override editor options for 2-space indent
             editor.options = { ...editor.options, tabSize: 2, insertSpaces: true };
             
@@ -312,10 +232,7 @@ suite('SmartEndHandler', () => {
         
         test('End with tab indent', async () => {
             const content = 'function test() {\n⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             editor.options = { ...editor.options, insertSpaces: false };
             
             await handler.execute(editor);
@@ -329,10 +246,7 @@ suite('SmartEndHandler', () => {
         
         test('End with 8-space indent', async () => {
             const content = 'class A {\n⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             editor.options = { ...editor.options, tabSize: 8, insertSpaces: true };
             
             await handler.execute(editor);
@@ -347,10 +261,7 @@ suite('SmartEndHandler', () => {
     suite('Edge cases', () => {
         test('End on line with only spaces', async () => {
             const content = '     ⌘     ';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             // Empty line should get no/minimal indent
@@ -374,22 +285,17 @@ suite('SmartEndHandler', () => {
         
         test('End at very end of document', async () => {
             const content = 'last line   ⌘';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             // Should toggle to trimmed end
-            assert.ok(editor.selection.active.character <= text.length);
+            const lineLength = editor.document.lineAt(0).text.length;
+            assert.ok(editor.selection.active.character <= lineLength);
         });
         
         test('End on single character line', async () => {
             const content = '⌘x';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             assert.strictEqual(editor.selection.active.character, 1);
@@ -397,10 +303,7 @@ suite('SmartEndHandler', () => {
         
         test('End on line with Unicode characters', async () => {
             const content = '⌘const emoji = "😀";   ';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             // Should handle Unicode properly
@@ -411,10 +314,7 @@ suite('SmartEndHandler', () => {
     suite('Complex scenarios', () => {
         test('End in nested object literal', async () => {
             const content = 'const obj = {\n    nested: {\n⌘\n    }\n};';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -426,10 +326,7 @@ suite('SmartEndHandler', () => {
         
         test('End after colon in object', async () => {
             const content = 'const obj = {\n    key:⌘   \n};';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             // Should go to end (trimmed or full)
@@ -438,10 +335,7 @@ suite('SmartEndHandler', () => {
         
         test('End in JSX-like content', async () => {
             const content = '<div>\n⌘\n</div>';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -453,10 +347,7 @@ suite('SmartEndHandler', () => {
         
         test('End after opening parenthesis', async () => {
             const content = 'function test(\n⌘\n)';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -468,10 +359,7 @@ suite('SmartEndHandler', () => {
         
         test('End in switch statement', async () => {
             const content = 'switch (x) {\n    case 1:\n⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -484,10 +372,7 @@ suite('SmartEndHandler', () => {
     suite('Whitespace handling', () => {
         test('End on line with only tabs', async () => {
             const content = '\t\t⌘\t';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             // Should handle tabs as whitespace
@@ -496,10 +381,7 @@ suite('SmartEndHandler', () => {
         
         test('End on line with mixed tabs and spaces', async () => {
             const content = '\t  ⌘code  \t';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             // Should go to trimmed end
@@ -508,10 +390,7 @@ suite('SmartEndHandler', () => {
         
         test('End on line ending with newline char visible', async () => {
             const content = 'code⌘\n';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             assert.strictEqual(editor.selection.active.line, 0);
@@ -557,10 +436,7 @@ suite('SmartEndHandler', () => {
     suite('Indent based on previous line', () => {
         test('End after class declaration', async () => {
             const content = 'class MyClass {\n⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -571,10 +447,7 @@ suite('SmartEndHandler', () => {
         
         test('End after if statement', async () => {
             const content = 'if (condition) {\n⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -585,10 +458,7 @@ suite('SmartEndHandler', () => {
         
         test('End after arrow function', async () => {
             const content = 'const fn = () => {\n⌘\n};';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();

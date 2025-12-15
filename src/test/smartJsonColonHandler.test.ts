@@ -1,54 +1,6 @@
 import * as assert from 'assert';
-import * as vscode from 'vscode';
 import { SmartJsonColonHandler } from '../handlers/smartJsonColonHandler';
-
-const CURSOR = '⌘';
-
-/**
- * Helper to parse cursor position from text with marker
- */
-function parseCursor(textWithCursor: string): { text: string; offset: number } {
-    const offset = textWithCursor.indexOf(CURSOR);
-    if (offset === -1) {
-        throw new Error(`No cursor marker ${CURSOR} found in text`);
-    }
-    const text = textWithCursor.slice(0, offset) + textWithCursor.slice(offset + CURSOR.length);
-    return { text, offset };
-}
-
-/**
- * Helper to find line and character from absolute offset
- */
-function offsetToPosition(text: string, offset: number): { line: number; character: number } {
-    const lines = text.split(/\r?\n/);
-    let currentOffset = 0;
-    
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-        const lineLength = lines[lineNum].length;
-        if (currentOffset + lineLength >= offset) {
-            return { line: lineNum, character: offset - currentOffset };
-        }
-        currentOffset += lineLength + 1;
-    }
-    
-    return { line: lines.length - 1, character: lines[lines.length - 1].length };
-}
-
-/**
- * Create a mock text editor
- */
-async function createMockEditor(content: string, cursorLine: number, cursorChar: number, language: string = 'json'): Promise<vscode.TextEditor> {
-    const document = await vscode.workspace.openTextDocument({
-        content: content,
-        language: language
-    });
-    
-    const editor = await vscode.window.showTextDocument(document);
-    const position = new vscode.Position(cursorLine, cursorChar);
-    editor.selection = new vscode.Selection(position, position);
-    
-    return editor;
-}
+import { CURSOR, createEditorWithCursor } from './helpers/editorTestUtils';
 
 suite('SmartJsonColonHandler', () => {
     let handler: SmartJsonColonHandler;
@@ -57,30 +9,25 @@ suite('SmartJsonColonHandler', () => {
         handler = new SmartJsonColonHandler();
     });
     
-    suite('Auto-add whitespace after colon', () => {
-        test('Should add space after colon following property name', async () => {
-            const content = '{\n  "name"⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
-            await handler.execute(editor);
-            
-            const resultText = editor.document.getText();
-            const lines = resultText.split(/\r?\n/);
-            
-            // Should have `: ` (colon with space)
-            assert.ok(lines[1].includes('"name": '), 'Should have space after colon');
-            // Cursor should be after the space
-            assert.strictEqual(editor.selection.active.character, character + 2);
-        });
-        
-        test('Should add space even with trailing whitespace before cursor', async () => {
-            const content = '{\n  "name" ⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+	suite('Auto-add whitespace after colon', () => {
+		test('Should add space after colon following property name', async () => {
+			const content = '{\n  "name"⌘\n}';
+			const editor = await createEditorWithCursor(content, 'json');
+			const initialCharacter = editor.selection.active.character;
+			await handler.execute(editor);
+			
+			const resultText = editor.document.getText();
+			const lines = resultText.split(/\r?\n/);
+			
+			// Should have `: ` (colon with space)
+			assert.ok(lines[1].includes('"name": '), 'Should have space after colon');
+			// Cursor should be after the space
+			assert.strictEqual(editor.selection.active.character, initialCharacter + 2);
+		});
+		
+		test('Should add space even with trailing whitespace before cursor', async () => {
+			const content = '{\n  "name" ⌘\n}';
+			const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -88,32 +35,26 @@ suite('SmartJsonColonHandler', () => {
             
             assert.ok(lines[1].includes('"name": '), 'Should have space after colon');
         });
-        
-        test('Should work with JSONC', async () => {
-            const content = '{\n  "name"⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'jsonc');
-            await handler.execute(editor);
-            
-            const resultText = editor.document.getText();
-            const lines = resultText.split(/\r?\n/);
-            
+		
+		test('Should work with JSONC', async () => {
+			const content = '{\n  "name"⌘\n}';
+			const editor = await createEditorWithCursor(content, 'jsonc');
+			await handler.execute(editor);
+			
+			const resultText = editor.document.getText();
+			const lines = resultText.split(/\r?\n/);
+			
             assert.ok(lines[1].includes('"name": '), 'Should work in JSONC files');
         });
-        
-        test('Should NOT add space in non-JSON files', async () => {
-            const content = '{\n  "name"⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'typescript');
-            await handler.execute(editor);
-            
-            const resultText = editor.document.getText();
-            const lines = resultText.split(/\r?\n/);
-            
+		
+		test('Should NOT add space in non-JSON files', async () => {
+			const content = '{\n  "name"⌘\n}';
+			const editor = await createEditorWithCursor(content, 'typescript');
+			await handler.execute(editor);
+			
+			const resultText = editor.document.getText();
+			const lines = resultText.split(/\r?\n/);
+			
             // Should just insert colon without space
             assert.strictEqual(lines[1].includes('"name": '), false, 'Should not add space in non-JSON files');
         });
@@ -122,10 +63,7 @@ suite('SmartJsonColonHandler', () => {
     suite('Auto-add quotes to property names', () => {
         test('Should add quotes to unquoted property name', async () => {
             const content = '{\n  name⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -137,10 +75,7 @@ suite('SmartJsonColonHandler', () => {
         
         test('Should add quotes to property name with numbers', async () => {
             const content = '{\n  prop123⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -151,10 +86,7 @@ suite('SmartJsonColonHandler', () => {
         
         test('Should add quotes to camelCase property', async () => {
             const content = '{\n  firstName⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -165,10 +97,7 @@ suite('SmartJsonColonHandler', () => {
         
         test('Should NOT add quotes if already quoted', async () => {
             const content = '{\n  "name"⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -181,10 +110,7 @@ suite('SmartJsonColonHandler', () => {
         
         test('Should handle property with underscore', async () => {
             const content = '{\n  first_name⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -195,10 +121,7 @@ suite('SmartJsonColonHandler', () => {
         
         test('Should work in JSONC', async () => {
             const content = '{\n  name⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'jsonc');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -206,14 +129,11 @@ suite('SmartJsonColonHandler', () => {
             
             assert.ok(lines[1].includes('"name": '), 'Should work in JSONC');
         });
-        
-        test('Should NOT quote in non-JSON files', async () => {
-            const content = '{\n  name⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'typescript');
-            await handler.execute(editor);
+		
+		test('Should NOT quote in non-JSON files', async () => {
+			const content = '{\n  name⌘\n}';
+			const editor = await createEditorWithCursor(content, 'typescript');
+			await handler.execute(editor);
             
             const resultText = editor.document.getText();
             const lines = resultText.split(/\r?\n/);
@@ -226,10 +146,7 @@ suite('SmartJsonColonHandler', () => {
     suite('Combined: Quotes + Whitespace', () => {
         test('Should add both quotes and space for unquoted property', async () => {
             const content = '{\n  name⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -241,10 +158,7 @@ suite('SmartJsonColonHandler', () => {
         
         test('Should add only space for already quoted property', async () => {
             const content = '{\n  "name"⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -259,10 +173,7 @@ suite('SmartJsonColonHandler', () => {
     suite('Edge cases', () => {
         test('Should NOT activate if there is already a colon', async () => {
             const content = '{\n  "name":⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             const initialText = editor.document.getText();
             
             await handler.execute(editor);
@@ -275,10 +186,7 @@ suite('SmartJsonColonHandler', () => {
         
         test('Should handle property at start of object', async () => {
             const content = '{\nname⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();

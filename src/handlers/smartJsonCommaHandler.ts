@@ -1,14 +1,9 @@
 import * as vscode from 'vscode';
+import { insertNewLine } from '../utils/editorCommands';
 import { getSmartKeysConfiguration } from '../configuration';
+import { isJsonDocument } from '../utils/jsonHelpers';
 
 export class SmartJsonCommaHandler {
-	/**
-	 * Check if the document is JSON or JSONC
-	 */
-	private isJsonDocument(document: vscode.TextDocument): boolean {
-		return document.languageId === 'json' || document.languageId === 'jsonc';
-	}
-
 	/**
 	 * Check if a line needs a comma (has a value but no comma at the end)
 	 */
@@ -40,15 +35,8 @@ export class SmartJsonCommaHandler {
 			trimmed.endsWith('true') ||
 			trimmed.endsWith('false') ||
 			trimmed.endsWith('null');
-		
-		return endsWithValue;
-	}
 
-	/**
-	 * Insert default newline
-	 */
-	private async insertDefaultNewLine(): Promise<void> {
-		await vscode.commands.executeCommand('type', { text: '\n' });
+		return endsWithValue;
 	}
 
 	/**
@@ -58,10 +46,10 @@ export class SmartJsonCommaHandler {
 		editor: vscode.TextEditor,
 		options?: { insertNewLine?: boolean }
 	): Promise<boolean> {
-		const insertNewLine = options?.insertNewLine ?? true;
+		const shouldInsertNewLine = options?.insertNewLine ?? true;
 		const insertNewLineIfAllowed = async () => {
-			if (insertNewLine) {
-				await this.insertDefaultNewLine();
+			if (shouldInsertNewLine) {
+				await insertNewLine();
 			}
 		};
 
@@ -75,7 +63,7 @@ export class SmartJsonCommaHandler {
 		}
 
 		// Only activate for JSON/JSONC files
-		if (!this.isJsonDocument(document)) {
+		if (!isJsonDocument(document)) {
 			await insertNewLineIfAllowed();
 			return false;
 		}

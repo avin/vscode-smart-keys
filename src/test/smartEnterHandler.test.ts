@@ -1,59 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { SmartEnterHandler } from '../handlers/smartEnterHandler';
-
-const CURSOR = '⌘';
-
-/**
- * Helper to parse cursor position from text with marker
- */
-function parseCursor(textWithCursor: string): { text: string; offset: number } {
-    const offset = textWithCursor.indexOf(CURSOR);
-    if (offset === -1) {
-        throw new Error(`No cursor marker ${CURSOR} found in text`);
-    }
-    const text = textWithCursor.slice(0, offset) + textWithCursor.slice(offset + CURSOR.length);
-    return { text, offset };
-}
-
-/**
- * Helper to find line and character from absolute offset
- */
-function offsetToPosition(text: string, offset: number): { line: number; character: number } {
-    const lines = text.split(/\r?\n/);
-    let currentOffset = 0;
-    
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-        const lineLength = lines[lineNum].length;
-        if (currentOffset + lineLength >= offset) {
-            return { line: lineNum, character: offset - currentOffset };
-        }
-        currentOffset += lineLength + 1;
-    }
-    
-    return { line: lines.length - 1, character: lines[lines.length - 1].length };
-}
-
-/**
- * Create a mock text editor
- */
-async function createMockEditor(
-    content: string,
-    cursorLine: number,
-    cursorChar: number,
-    language: string = 'typescript'
-): Promise<vscode.TextEditor> {
-    const document = await vscode.workspace.openTextDocument({
-        content: content,
-        language: language
-    });
-    
-    const editor = await vscode.window.showTextDocument(document);
-    const position = new vscode.Position(cursorLine, cursorChar);
-    editor.selection = new vscode.Selection(position, position);
-    
-    return editor;
-}
+import { CURSOR, createEditorWithCursor, createMockEditor } from './helpers/editorTestUtils';
 
 suite('SmartEnterHandler', () => {
     let handler: SmartEnterHandler;
@@ -65,10 +13,7 @@ suite('SmartEnterHandler', () => {
     suite('Auto-insert closing brace', () => {
         test('Enter after opening brace - should insert closing brace', async () => {
             const content = 'function test() {⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -84,30 +29,37 @@ suite('SmartEnterHandler', () => {
             assert.strictEqual(editor.selection.active.character, 4);
         });
         
-        test('Enter after brace with trailing spaces - should trim spaces', async () => {
-            const content = 'if (x) {   ⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
-            await handler.execute(editor);
-            
+		test('Enter after brace with trailing spaces - should trim spaces', async () => {
+			const content = 'if (x) {   ⌘}';
+			const editor = await createEditorWithCursor(content);
+			await handler.execute(editor);
+			
             const resultText = editor.document.getText();
             const lines = resultText.split(/\r?\n/);
             
             // Trailing spaces are removed from the opening line
             assert.strictEqual(lines[0].trimEnd(), 'if (x) {');
-            assert.strictEqual(lines[1], '    ');
-            assert.strictEqual(lines[2], '}');
-        });
-        
-        test('Enter after brace in nested block - should use correct indent', async () => {
-            const content = 'class A {\n    method() {⌘}\n}';
-            const { text, offset} = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
-            editor.options = { tabSize: 4, insertSpaces: true };
+			assert.strictEqual(lines[1], '    ');
+			assert.strictEqual(lines[2], '}');
+		});
+
+		test('Enter after brace with trailing content - should preserve suffix', async () => {
+			const content = 'function test() {⌘};';
+			const editor = await createEditorWithCursor(content);
+			await handler.execute(editor);
+
+			const resultText = editor.document.getText();
+			const lines = resultText.split(/\r?\n/);
+
+			assert.strictEqual(lines[0], 'function test() {');
+			assert.strictEqual(lines[1], '    ');
+			assert.strictEqual(lines[2], '};');
+		});
+		
+		test('Enter after brace in nested block - should use correct indent', async () => {
+			const content = 'class A {\n    method() {⌘}\n}';
+			const editor = await createEditorWithCursor(content);
+			editor.options = { tabSize: 4, insertSpaces: true };
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -123,10 +75,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace when closing brace exists - should not insert', async () => {
             const content = 'function test() {⌘\n    return 1;\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -139,10 +88,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace in balanced code - should not insert', async () => {
             const content = 'const obj = {⌘\n    key: "value"\n};';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -154,10 +100,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace when unmatched - should insert closing', async () => {
             const content = 'function outer() {\n    function inner() {⌘\n';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -172,10 +115,7 @@ suite('SmartEnterHandler', () => {
     suite('Enter before closing brace', () => {
         test('Enter before brace - should use default behavior', async () => {
             const content = 'function test() {⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -187,10 +127,7 @@ suite('SmartEnterHandler', () => {
     suite('Enter without opening brace', () => {
         test('Enter in middle of line - should use default behavior', async () => {
             const content = 'const x = ⌘1;';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -202,10 +139,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter at end of line without brace', async () => {
             const content = 'const x = 1;⌘';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -217,10 +151,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter on empty line', async () => {
             const content = '⌘';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -249,10 +180,7 @@ suite('SmartEnterHandler', () => {
     suite('Edge cases', () => {
         test('Enter after brace at start of document', async () => {
             const content = '{⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -265,10 +193,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace with no indent', async () => {
             const content = '{⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -279,10 +204,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace in string - should use default', async () => {
             const content = 'const s = "{⌘}";';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -294,10 +216,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace in comment - should use default', async () => {
             const content = '// test {⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -309,10 +228,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after other characters', async () => {
             const content = 'const x = [⌘];';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -325,10 +241,7 @@ suite('SmartEnterHandler', () => {
     suite('Complex scenarios', () => {
         test('Enter after brace in arrow function', async () => {
             const content = 'const fn = () => {⌘};';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -341,10 +254,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace in method', async () => {
             const content = 'class A {\n    method() {⌘}\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -357,10 +267,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace in JSX', async () => {
             const content = 'function Comp() {⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -372,10 +279,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace with complex nesting', async () => {
             const content = 'if (a) {\n    if (b) {\n        if (c) {⌘}\n    }\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -388,10 +292,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace in switch case', async () => {
             const content = 'switch (x) {\n    case 1: {⌘}\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -404,10 +305,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter after brace in try-catch', async () => {
             const content = 'try {⌘} catch (e) {}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -421,10 +319,7 @@ suite('SmartEnterHandler', () => {
     suite('Different indent configurations', () => {
         test('Enter with 2-space indent', async () => {
             const content = 'if (x) {⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             editor.options = { tabSize: 2, insertSpaces: true };
             
             await handler.execute(editor);
@@ -437,10 +332,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter with 8-space indent', async () => {
             const content = 'if (x) {⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             editor.options = { tabSize: 8, insertSpaces: true };
             
             await handler.execute(editor);
@@ -453,10 +345,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter with tab indent', async () => {
             const content = 'if (x) {⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             editor.options = { tabSize: 4, insertSpaces: false };
             
             await handler.execute(editor);
@@ -471,10 +360,7 @@ suite('SmartEnterHandler', () => {
     suite('JSON integration', () => {
         test('Enter after opening brace in JSON should insert closing brace', async () => {
             const content = `{\n  "config": {${CURSOR}\n}`;
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -489,10 +375,7 @@ suite('SmartEnterHandler', () => {
 
         test('Enter after JSON property value should still add comma before newline', async () => {
             const content = `{\n  "name": "test"${CURSOR}\n  "age": 25\n}`;
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -506,10 +389,7 @@ suite('SmartEnterHandler', () => {
     suite('Regression tests', () => {
         test('Enter after brace that steals closing from outer block', async () => {
             const content = 'function outer() {\n    const inner = () => {⌘\n';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -522,10 +402,7 @@ suite('SmartEnterHandler', () => {
         
         test('Enter multiple times in sequence', async () => {
             const content = 'function test() {⌘}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character);
+            const editor = await createEditorWithCursor(content);
             
             await handler.execute(editor);
             

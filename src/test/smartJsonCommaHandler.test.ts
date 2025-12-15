@@ -1,54 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { SmartJsonCommaHandler } from '../handlers/smartJsonCommaHandler';
-
-const CURSOR = '⌘';
-
-/**
- * Helper to parse cursor position from text with marker
- */
-function parseCursor(textWithCursor: string): { text: string; offset: number } {
-    const offset = textWithCursor.indexOf(CURSOR);
-    if (offset === -1) {
-        throw new Error(`No cursor marker ${CURSOR} found in text`);
-    }
-    const text = textWithCursor.slice(0, offset) + textWithCursor.slice(offset + CURSOR.length);
-    return { text, offset };
-}
-
-/**
- * Helper to find line and character from absolute offset
- */
-function offsetToPosition(text: string, offset: number): { line: number; character: number } {
-    const lines = text.split(/\r?\n/);
-    let currentOffset = 0;
-    
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-        const lineLength = lines[lineNum].length;
-        if (currentOffset + lineLength >= offset) {
-            return { line: lineNum, character: offset - currentOffset };
-        }
-        currentOffset += lineLength + 1;
-    }
-    
-    return { line: lines.length - 1, character: lines[lines.length - 1].length };
-}
-
-/**
- * Create a mock text editor
- */
-async function createMockEditor(content: string, cursorLine: number, cursorChar: number, language: string = 'json'): Promise<vscode.TextEditor> {
-    const document = await vscode.workspace.openTextDocument({
-        content: content,
-        language: language
-    });
-    
-    const editor = await vscode.window.showTextDocument(document);
-    const position = new vscode.Position(cursorLine, cursorChar);
-    editor.selection = new vscode.Selection(position, position);
-    
-    return editor;
-}
+import { CURSOR, createEditorWithCursor } from './helpers/editorTestUtils';
 
 suite('SmartJsonCommaHandler', () => {
     let handler: SmartJsonCommaHandler;
@@ -60,10 +13,7 @@ suite('SmartJsonCommaHandler', () => {
     suite('Insert missing comma on Enter in JSON', () => {
         test('Should add comma after property value without comma', async () => {
             const content = '{\n  "name": "test"⌘\n  "age": 25\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -76,10 +26,7 @@ suite('SmartJsonCommaHandler', () => {
         
         test('Should add comma after number value', async () => {
             const content = '{\n  "age": 25⌘\n  "name": "test"\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -90,10 +37,7 @@ suite('SmartJsonCommaHandler', () => {
         
         test('Should add comma after boolean value', async () => {
             const content = '{\n  "isActive": true⌘\n  "name": "test"\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -104,10 +48,7 @@ suite('SmartJsonCommaHandler', () => {
         
         test('Should add comma after null value', async () => {
             const content = '{\n  "data": null⌘\n  "name": "test"\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -118,10 +59,7 @@ suite('SmartJsonCommaHandler', () => {
         
         test('Should add comma after array value', async () => {
             const content = '{\n  "items": [1, 2, 3]⌘\n  "name": "test"\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -130,13 +68,10 @@ suite('SmartJsonCommaHandler', () => {
             assert.ok(lines[1].includes('"items": [1, 2, 3],'), 'Should have comma after array');
         });
         
-        test('Should add comma after nested object', async () => {
-            const content = '{\n  "config": {"x": 1}⌘\n  "name": "test"\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
-            await handler.execute(editor);
+		test('Should add comma after nested object', async () => {
+			const content = '{\n  "config": {"x": 1}⌘\n  "name": "test"\n}';
+			const editor = await createEditorWithCursor(content, 'json');
+			await handler.execute(editor);
             
             const resultText = editor.document.getText();
             const lines = resultText.split(/\r?\n/);
@@ -146,10 +81,7 @@ suite('SmartJsonCommaHandler', () => {
         
         test('Should NOT add comma when already present', async () => {
             const content = '{\n  "name": "test",⌘\n  "age": 25\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -162,10 +94,7 @@ suite('SmartJsonCommaHandler', () => {
         
         test('Should add comma even if next line is closing brace', async () => {
             const content = '{\n  "name": "test"⌘\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
+            const editor = await createEditorWithCursor(content, 'json');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -177,10 +106,7 @@ suite('SmartJsonCommaHandler', () => {
         
         test('Should work with JSONC language', async () => {
             const content = '{\n  "name": "test"⌘\n  "age": 25\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'jsonc');
+            const editor = await createEditorWithCursor(content, 'jsonc');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -191,10 +117,7 @@ suite('SmartJsonCommaHandler', () => {
         
         test('Should NOT activate in non-JSON files', async () => {
             const content = '{\n  "name": "test"⌘\n  "age": 25\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'typescript');
+            const editor = await createEditorWithCursor(content, 'typescript');
             await handler.execute(editor);
             
             const resultText = editor.document.getText();
@@ -204,27 +127,21 @@ suite('SmartJsonCommaHandler', () => {
             assert.ok(!lines[1].includes(','), 'Should not add comma in TypeScript files');
         });
         
-        test('Should NOT add comma if line is empty or only whitespace', async () => {
-            const content = '{\n  ⌘\n  "age": 25\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
-            await handler.execute(editor);
-            
+		test('Should NOT add comma if line is empty or only whitespace', async () => {
+			const content = '{\n  ⌘\n  "age": 25\n}';
+			const editor = await createEditorWithCursor(content, 'json');
+			await handler.execute(editor);
+			
             const resultText = editor.document.getText();
             
             // Should just insert newline
             assert.ok(!resultText.includes(','), 'Should not add comma on empty line');
         });
         
-        test('Should add comma with trailing whitespace after value', async () => {
-            const content = '{\n  "name": "test"   ⌘\n  "age": 25\n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
-            await handler.execute(editor);
+		test('Should add comma with trailing whitespace after value', async () => {
+			const content = '{\n  "name": "test"   ⌘\n  "age": 25\n}';
+			const editor = await createEditorWithCursor(content, 'json');
+			await handler.execute(editor);
             
             const resultText = editor.document.getText();
             const lines = resultText.split(/\r?\n/);
@@ -233,19 +150,41 @@ suite('SmartJsonCommaHandler', () => {
             assert.ok(lines[1].trim().endsWith('"name": "test",'), 'Should have comma after value even with trailing spaces');
         });
         
-        test('Should add comma even if next non-empty line is closing bracket', async () => {
-            const content = '{\n  "name": "test"⌘\n  \n}';
-            const { text, offset } = parseCursor(content);
-            const { line, character } = offsetToPosition(text, offset);
-            
-            const editor = await createMockEditor(text, line, character, 'json');
-            await handler.execute(editor);
-            
-            const resultText = editor.document.getText();
-            const lines = resultText.split(/\r?\n/);
-            
-            // Should add comma even if next non-empty line is closing brace
-            assert.ok(lines[1].includes(','), 'Should have comma after value');
-        });
-    });
+		test('Should add comma even if next non-empty line is closing bracket', async () => {
+			const content = '{\n  "name": "test"⌘\n  \n}';
+			const editor = await createEditorWithCursor(content, 'json');
+			await handler.execute(editor);
+			
+			const resultText = editor.document.getText();
+			const lines = resultText.split(/\r?\n/);
+			
+			// Should add comma even if next non-empty line is closing brace
+			assert.ok(lines[1].includes(','), 'Should have comma after value');
+		});
+
+		test('Should not add comma when selection is active', async () => {
+			const content = '{\n  "name": "test"⌘\n}';
+			const editor = await createEditorWithCursor(content, 'json');
+			const lineText = editor.document.lineAt(1).text;
+			const start = new vscode.Position(1, lineText.indexOf('"name"'));
+			const end = new vscode.Position(1, lineText.length);
+			editor.selection = new vscode.Selection(start, end);
+
+			await handler.execute(editor);
+
+			const resultText = editor.document.getText();
+			assert.ok(!resultText.includes(','), 'Should avoid inserting comma when selection exists');
+		});
+
+		test('Should add comma without inserting newline when disabled', async () => {
+			const content = '{\n  "name": "test"⌘\n}';
+			const editor = await createEditorWithCursor(content, 'json');
+
+			await handler.execute(editor, { insertNewLine: false });
+
+			const lines = editor.document.getText().split(/\r?\n/);
+			assert.ok(lines[1].endsWith('"name": "test",'), 'Should append comma on the same line');
+			assert.strictEqual(lines.length, 3, 'Should not insert an extra newline');
+		});
+	});
 });
