@@ -4,7 +4,7 @@
   "publisher": "c75",
   "icon": "icon.png",
   "description": "Smart keys similar to JetBrains IDEs",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/avin/vscode-smart-keys"
