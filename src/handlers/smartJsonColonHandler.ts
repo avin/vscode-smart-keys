@@ -1,7 +1,13 @@
 import * as vscode from 'vscode';
 import { getSmartKeysConfiguration } from '../configuration';
-import { typeText } from '../utils/editorCommands';
 import { isJsonDocument } from '../utils/jsonHelpers';
+
+/**
+ * Type colon using default VS Code command (bypasses type interceptor)
+ */
+async function typeColonDefault(): Promise<void> {
+	await vscode.commands.executeCommand('default:type', { text: ':' });
+}
 
 export class SmartJsonColonHandler {
 	/**
@@ -36,7 +42,8 @@ export class SmartJsonColonHandler {
 		}
 		
 		// Try to match unquoted property: propertyName with optional trailing whitespace
-		const unquotedMatch = textBeforeCursor.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*)$/);
+		// Also supports dotted names like "workbench.statusBar.visible"
+		const unquotedMatch = textBeforeCursor.match(/([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)(\s*)$/);
 		if (unquotedMatch) {
 			const propertyName = unquotedMatch[1];
 			const trailingWhitespace = unquotedMatch[2].length;
@@ -72,13 +79,13 @@ export class SmartJsonColonHandler {
 
 		// Only activate for JSON/JSONC files
 		if (!isJsonDocument(document)) {
-			await typeText(':');
+			await typeColonDefault();
 			return;
 		}
 
 		// Don't handle multi-cursor or selection
 		if (!selection.isEmpty) {
-			await typeText(':');
+			await typeColonDefault();
 			return;
 		}
 
@@ -89,7 +96,7 @@ export class SmartJsonColonHandler {
 
 		// Check if there's already a colon after cursor
 		if (this.hasColonAfterCursor(lineText, currentChar)) {
-			await typeText(':');
+			await typeColonDefault();
 			return;
 		}
 
@@ -97,7 +104,7 @@ export class SmartJsonColonHandler {
 		const propertyInfo = this.findPropertyNameBeforeCursor(lineText, currentChar);
 		
 		if (!propertyInfo) {
-			await typeText(':');
+			await typeColonDefault();
 			return;
 		}
 
