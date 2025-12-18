@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { SmartBackspaceHandler } from '../handlers/smartBackspaceHandler';
-import { CURSOR, createEditorWithCursor, createMockEditor } from './helpers/editorTestUtils';
+import { CURSOR, createEditorWithCursor, createMockEditor, createEditorWithMultipleCursors } from './helpers/editorTestUtils';
 
 suite('SmartBackspaceHandler', () => {
     let handler: SmartBackspaceHandler;
@@ -513,6 +513,37 @@ suite('SmartBackspaceHandler', () => {
             const resultText = editor.document.getText();
             
             assert.strictEqual(resultText.split(/\r?\n/).length, 1);
+        });
+    });
+
+    suite('Multi-cursor support', () => {
+        test('Backspace with multiple cursors - should use default behavior', async () => {
+            const content = 'cod⌘e\ntes⌘t';
+            const editor = await createEditorWithMultipleCursors(content);
+            
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            
+            // Should delete one character at each cursor (default behavior)
+            // First line: 'code' -> 'coe' (delete 'd')
+            // Second line: 'test' -> 'tet' (delete 's')
+            assert.ok(resultText.includes('coe'));
+            assert.ok(resultText.includes('tet'));
+            assert.strictEqual(editor.selections.length, 2);
+        });
+
+        test('Backspace with multiple cursors on empty lines - should use default behavior', async () => {
+            const content = 'function test() {\n\n    ⌘\n}\nif (x) {\n\n    ⌘\n}';
+            const editor = await createEditorWithMultipleCursors(content);
+            
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            
+            // Should use default behavior (not smart backspace logic)
+            // Both cursors should delete one character/space
+            assert.strictEqual(editor.selections.length, 2);
         });
     });
 });

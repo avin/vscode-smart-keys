@@ -53,3 +53,57 @@ export async function createEditorWithCursor(
 	const { line, character } = offsetToPosition(text, offset);
 	return createMockEditor(text, line, character, language);
 }
+
+/**
+ * Parse multiple cursor positions from text.
+ * Example: "line1⌘\nline2⌘" -> { text: "line1\nline2", offsets: [5, 11] }
+ */
+export function parseMultipleCursors(textWithCursors: string): { text: string; offsets: number[] } {
+	const offsets: number[] = [];
+	let text = textWithCursors;
+	let searchFrom = 0;
+
+	while (true) {
+		const index = text.indexOf(CURSOR, searchFrom);
+		if (index === -1) {
+			break;
+		}
+		offsets.push(index);
+		// Remove cursor marker and continue search
+		text = text.slice(0, index) + text.slice(index + CURSOR.length);
+		searchFrom = index; // Continue from same position (marker removed)
+	}
+
+	if (offsets.length === 0) {
+		throw new Error(`No cursor markers ${CURSOR} found in text`);
+	}
+
+	return { text, offsets };
+}
+
+/**
+ * Create editor with multiple cursors.
+ * Example: "line1⌘\nline2⌘" will create two cursors.
+ */
+export async function createEditorWithMultipleCursors(
+	textWithCursors: string,
+	language: string = 'typescript'
+): Promise<vscode.TextEditor> {
+	const { text, offsets } = parseMultipleCursors(textWithCursors);
+	const document = await vscode.workspace.openTextDocument({
+		content: text,
+		language
+	});
+
+	const editor = await vscode.window.showTextDocument(document);
+	
+	// Convert offsets to positions and create selections
+	const selections = offsets.map(offset => {
+		const { line, character } = offsetToPosition(text, offset);
+		const position = new vscode.Position(line, character);
+		return new vscode.Selection(position, position);
+	});
+
+	editor.selections = selections;
+	return editor;
+}

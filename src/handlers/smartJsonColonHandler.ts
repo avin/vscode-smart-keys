@@ -71,10 +71,11 @@ export class SmartJsonColonHandler {
 	}
 
 	/**
-	 * Execute smart colon insertion
+	 * Execute smart colon insertion.
+	 * Note: Multi-cursor support uses fallback to default behavior.
 	 */
 	public async execute(editor: vscode.TextEditor): Promise<void> {
-		const { document, selection } = editor;
+		const { document, selections } = editor;
 		const config = getSmartKeysConfiguration();
 
 		// Only activate for JSON/JSONC files
@@ -83,7 +84,15 @@ export class SmartJsonColonHandler {
 			return;
 		}
 
-		// Don't handle multi-cursor or selection
+		// Multi-cursor: use default behavior (complex property name quoting would be tricky)
+		if (selections.length > 1) {
+			await typeColonDefault();
+			return;
+		}
+
+		const selection = selections[0];
+
+		// Don't handle selection
 		if (!selection.isEmpty) {
 			await typeColonDefault();
 			return;

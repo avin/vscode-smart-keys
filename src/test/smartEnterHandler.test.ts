@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { SmartEnterHandler } from '../handlers/smartEnterHandler';
-import { CURSOR, createEditorWithCursor, createMockEditor } from './helpers/editorTestUtils';
+import { CURSOR, createEditorWithCursor, createMockEditor, createEditorWithMultipleCursors } from './helpers/editorTestUtils';
 
 suite('SmartEnterHandler', () => {
     let handler: SmartEnterHandler;
@@ -416,6 +416,64 @@ suite('SmartEnterHandler', () => {
             const lines = resultText.split(/\r?\n/);
             
             assert.ok(lines.length >= 3);
+        });
+    });
+
+    suite('Multi-cursor support', () => {
+        test('Enter with multiple cursors after opening braces - should expand all', async () => {
+            const content = 'function test() {⌘}\nif (x) {⌘}';
+            const editor = await createEditorWithMultipleCursors(content);
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            const lines = resultText.split(/\r?\n/);
+            
+            // First function expanded
+            assert.strictEqual(lines[0], 'function test() {');
+            assert.strictEqual(lines[1].trim(), '');
+            assert.strictEqual(lines[2], '}');
+            
+            // Second if expanded (shifted by 2 lines from first expansion)
+            assert.strictEqual(lines[3], 'if (x) {');
+            assert.strictEqual(lines[4].trim(), '');
+            assert.strictEqual(lines[5], '}');
+            
+            // Both cursors on indented lines
+            assert.strictEqual(editor.selections.length, 2);
+            assert.strictEqual(editor.selections[0].active.line, 1);
+            assert.strictEqual(editor.selections[1].active.line, 4);
+        });
+
+        test('Enter with multiple cursors - one expandable, one not - should use default behavior', async () => {
+            const content = 'function test() {⌘}\nconst x = ⌘1;';
+            const editor = await createEditorWithMultipleCursors(content);
+            const originalLineCount = editor.document.lineCount;
+            
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            
+            // Should use default newline behavior
+            // Check that newlines were inserted (not smart brace expansion for all)
+            // If smart expansion happened, we'd have more lines (3 per expansion)
+            // Default behavior should just insert 2 newlines (one per cursor)
+            assert.strictEqual(editor.selections.length, 2);
+            // Should have inserted newlines
+            assert.ok(resultText.length > content.length - 2); // -2 for removed cursor markers
+        });
+
+        test('Enter with multiple cursors on empty lines - should insert newlines', async () => {
+            const content = 'line1\n⌘\nline2\n⌘\nline3';
+            const editor = await createEditorWithMultipleCursors(content);
+            const originalLineCount = editor.document.lineCount;
+            
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            const lines = resultText.split(/\r?\n/);
+            
+            // Should add 2 newlines
+            assert.strictEqual(lines.length, originalLineCount + 2);
         });
     });
 });

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { calculateIndent } from '../utils/indentHelpers';
-import { setCursorPosition } from '../utils/cursorHelpers';
+import { setCursorPosition, setCursorPositions } from '../utils/cursorHelpers';
 import { getSmartKeysConfiguration } from '../configuration';
 
 /**
@@ -72,15 +72,14 @@ export class SmartEndHandler {
 	}
 
 	/**
-	 * Handle End on a non-empty line.
+	 * Calculate target position for End key on non-empty line.
 	 */
-	private handleNonEmptyLine(
-		editor: vscode.TextEditor,
-		currentLine: number,
-		currentChar: number,
+	private calculateTargetPosition(
 		lineText: string,
+		currentChar: number,
+		currentLine: number,
 		documentUri: string
-	): void {
+	): { position: number; atTrimmedEnd: boolean } {
 		const trimmedLength = lineText.trimEnd().length;
 		const fullLength = lineText.length;
 		const lastPos = this.lastEndPositions.get(documentUri);
@@ -110,45 +109,120 @@ export class SmartEndHandler {
 			atTrimmedEnd = true;
 		}
 
-		setCursorPosition(editor, currentLine, targetPosition);
+		return { position: targetPosition, atTrimmedEnd };
+	}
+
+	/**
+	 * Handle End on a non-empty line.
+	 */
+	private handleNonEmptyLine(
+		editor: vscode.TextEditor,
+		currentLine: number,
+		currentChar: number,
+		lineText: string,
+		documentUri: string
+	): void {
+		const { position, atTrimmedEnd } = this.calculateTargetPosition(
+			lineText, currentChar, currentLine, documentUri
+		);
+
+		setCursorPosition(editor, currentLine, position);
 		
 		// Store state
 		this.lastEndPositions.set(documentUri, {
 			line: currentLine,
-			character: targetPosition,
-			atTrimmedEnd: atTrimmedEnd
+			character: position,
+			atTrimmedEnd
 		});
 	}
 
 	/**
-	 * Main handler for Smart End.
+	 * Main handler for Smart End - supports multiple cursors.
 	 */
 	public async execute(editor: vscode.TextEditor): Promise<void> {
 		const { smartEnd } = getSmartKeysConfiguration();
 		const document = editor.document;
-		const selection = editor.selection;
-		const currentLine = selection.active.line;
-		const currentChar = selection.active.character;
-		const lineText = document.lineAt(currentLine).text;
+		const selections = editor.selections;
 		const documentUri = document.uri.toString();
 
-		if (lineText.trim().length === 0) {
-			if (!smartEnd.indentEmptyLine) {
-				this.resetState(documentUri);
-				await vscode.commands.executeCommand('cursorEnd');
-				return;
+		// Check if all selections can use smart behavior
+		const canUseSmartBehavior = selections.every(selection => {
+			if (!selection.isEmpty) {
+				return false;
 			}
-			// Empty line
-			await this.handleEmptyLine(editor, document, currentLine, lineText, documentUri);
-		} else {
-			if (!smartEnd.toggleTrimmedEnd) {
-				this.resetState(documentUri);
-				await vscode.commands.executeCommand('cursorEnd');
-				return;
+			const currentLine = selection.active.line;
+			const lineText = document.lineAt(currentLine).text;
+			
+			if (lineText.trim().length === 0) {
+				return smartEnd.indentEmptyLine;
+			} else {
+				return smartEnd.toggleTrimmedEnd;
 			}
-			// Line with content
-			this.handleNonEmptyLine(editor, currentLine, currentChar, lineText, documentUri);
+		});
+
+		// If cannot use smart behavior for all cursors, fallback to default
+		if (!canUseSmartBehavior) {
+			this.resetState(documentUri);
+			await vscode.commands.executeCommand('cursorEnd');
+			return;
 		}
+
+		// For single cursor, use existing logic
+		if (selections.length === 1) {
+			const selection = selections[0];
+			const currentLine = selection.active.line;
+			const currentChar = selection.active.character;
+			const lineText = document.lineAt(currentLine).text;
+
+			if (lineText.trim().length === 0) {
+				await this.handleEmptyLine(editor, document, currentLine, lineText, documentUri);
+			} else {
+				this.handleNonEmptyLine(editor, currentLine, currentChar, lineText, documentUri);
+			}
+			return;
+		}
+
+		// Multi-cursor: process each cursor
+		const edits: Array<{ range: vscode.Range; text: string }> = [];
+		const newPositions: Array<{ line: number; character: number }> = [];
+
+		for (const selection of selections) {
+			const currentLine = selection.active.line;
+			const currentChar = selection.active.character;
+			const lineText = document.lineAt(currentLine).text;
+
+			if (lineText.trim().length === 0) {
+				// Empty line - calculate indent
+				const targetIndent = calculateIndent(editor, document, currentLine);
+				const lineRange = new vscode.Range(
+					new vscode.Position(currentLine, 0),
+					new vscode.Position(currentLine, lineText.length)
+				);
+				edits.push({ range: lineRange, text: targetIndent });
+				newPositions.push({ line: currentLine, character: targetIndent.length });
+			} else {
+				// Non-empty line - go to trimmed or full end
+				const { position } = this.calculateTargetPosition(
+					lineText, currentChar, currentLine, documentUri
+				);
+				newPositions.push({ line: currentLine, character: position });
+			}
+		}
+
+		// Apply edits if any
+		if (edits.length > 0) {
+			await editor.edit(editBuilder => {
+				for (const edit of edits) {
+					editBuilder.replace(edit.range, edit.text);
+				}
+			});
+		}
+
+		// Set all cursor positions
+		setCursorPositions(editor, newPositions);
+
+		// For multi-cursor, reset state (cannot track single state for multiple cursors)
+		this.resetState(documentUri);
 	}
 
 	/**

@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { SmartEndHandler } from '../handlers/smartEndHandler';
-import { CURSOR, createEditorWithCursor, createMockEditor } from './helpers/editorTestUtils';
+import { CURSOR, createEditorWithCursor, createMockEditor, createEditorWithMultipleCursors } from './helpers/editorTestUtils';
 
 suite('SmartEndHandler', () => {
     let handler: SmartEndHandler;
@@ -465,6 +465,51 @@ suite('SmartEndHandler', () => {
             const lines = resultText.split(/\r?\n/);
             
             assert.ok(lines[1].length > 0);
+        });
+    });
+
+    suite('Multi-cursor support', () => {
+        test('End with multiple cursors on non-empty lines - should move all to trimmed end', async () => {
+            const content = '⌘const x = 1;   \n⌘const y = 2;   ';
+            const editor = await createEditorWithMultipleCursors(content);
+            await handler.execute(editor);
+            
+            assert.strictEqual(editor.selections.length, 2);
+            assert.strictEqual(editor.selections[0].active.line, 0);
+            assert.strictEqual(editor.selections[0].active.character, 12); // trimmed end of line 1
+            assert.strictEqual(editor.selections[1].active.line, 1);
+            assert.strictEqual(editor.selections[1].active.character, 12); // trimmed end of line 2
+        });
+
+        test('End with multiple cursors on empty lines - should add indent to all', async () => {
+            const content = 'function test() {\n⌘\n}\nif (x) {\n⌘\n}';
+            const editor = await createEditorWithMultipleCursors(content);
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            const lines = resultText.split(/\r?\n/);
+            
+            // Both empty lines should have indent
+            assert.ok(lines[1].length > 0);
+            assert.ok(lines[4].length > 0);
+            assert.strictEqual(editor.selections.length, 2);
+        });
+
+        test('End with multiple cursors mixed (empty and non-empty) - should handle each independently', async () => {
+            const content = '⌘const x = 1;   \nfunction test() {\n⌘\n}';
+            const editor = await createEditorWithMultipleCursors(content);
+            await handler.execute(editor);
+            
+            const resultText = editor.document.getText();
+            const lines = resultText.split(/\r?\n/);
+            
+            // First cursor: moved to trimmed end
+            assert.strictEqual(editor.selections[0].active.line, 0);
+            assert.strictEqual(editor.selections[0].active.character, 12);
+            
+            // Second cursor: indent added on empty line
+            assert.ok(lines[2].length > 0);
+            assert.strictEqual(editor.selections[1].active.line, 2);
         });
     });
 });

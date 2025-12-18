@@ -187,17 +187,23 @@ export class SmartBackspaceHandler {
 
 	/**
 	 * Main handler for Smart Backspace.
+	 * 
+	 * Multi-cursor limitation: Falls back to default behavior when multiple cursors
+	 * are present, as smart operations (line deletion/joining) would affect positions
+	 * of other cursors unpredictably.
 	 */
 	public async execute(editor: vscode.TextEditor): Promise<void> {
 		const { smartBackspace } = getSmartKeysConfiguration();
 		const document = editor.document;
-		const selection = editor.selection;
+		const selections = editor.selections;
 		
-		// With selection use default behavior
-		if (!selection.isEmpty) {
+		// Use default behavior for multi-cursor or non-empty selections
+		if (selections.length > 1 || !selections[0].isEmpty) {
 			await vscode.commands.executeCommand('deleteLeft');
 			return;
 		}
+
+		const selection = selections[0];
 
 		const currentLine = selection.active.line;
 		const currentChar = selection.active.character;

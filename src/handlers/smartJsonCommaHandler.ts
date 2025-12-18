@@ -40,7 +40,8 @@ export class SmartJsonCommaHandler {
 	}
 
 	/**
-	 * Execute smart comma insertion on Enter
+	 * Execute smart comma insertion on Enter.
+	 * Note: Multi-cursor support uses fallback (skips comma insertion).
 	 */
 	public async execute(
 		editor: vscode.TextEditor,
@@ -53,7 +54,7 @@ export class SmartJsonCommaHandler {
 			}
 		};
 
-		const { document, selection } = editor;
+		const { document, selections } = editor;
 		const config = getSmartKeysConfiguration();
 
 		// Check if feature is enabled
@@ -68,7 +69,15 @@ export class SmartJsonCommaHandler {
 			return false;
 		}
 
-		// Don't handle multi-cursor or selection
+		// Multi-cursor: skip comma insertion
+		if (selections.length > 1) {
+			await insertNewLineIfAllowed();
+			return false;
+		}
+
+		const selection = selections[0];
+
+		// Don't handle selection
 		if (!selection.isEmpty) {
 			await insertNewLineIfAllowed();
 			return false;
